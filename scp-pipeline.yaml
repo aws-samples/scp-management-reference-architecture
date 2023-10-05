@@ -49,7 +49,11 @@ Parameters:
   terraformBucket:
     Description: "Name of the bucket containing the Terraform state information"
     Type: String
-    # Default: "iam-identitycenter-619254417006-tf-state"
+    # Default: "iam-identitycenter-ACCOUNTNAME-tf-state"
+  branchName:
+    Description: "Name fo the branch in the repository that should be used to source the pipeline"
+    Type: String
+    Default: "main"
 
 Conditions:
   BlankSNSTopic:
@@ -92,7 +96,7 @@ Resources:
               Configuration:
                 ConnectionArn: !GetAtt MyScpBitBucketConnection.ConnectionArn
                 FullRepositoryId: !Sub "${bitBucketOrgName}/${bitBucketRepoName}"
-                BranchName: master
+                BranchName: !Ref branchName
               OutputArtifacts:
                 - Name: SourceArtifact
         - Name: Terraform
