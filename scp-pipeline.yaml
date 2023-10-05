@@ -38,14 +38,6 @@ Parameters:
     Description: "SNS Topic ARN to notify for manual approvals"
     Type: String
     Default: ""
-  bitBucketOrgName:
-    Description: "Name of your BitBucket Organization"
-    Type: String
-    Default: "sirrombtest"
-  bitBucketRepoName:
-    Description: "Name of your BitBucket Repository"
-    Type: String
-    Default: "codestar_test"
   terraformBucket:
     Description: "Name of the bucket containing the Terraform state information"
     Type: String
@@ -62,14 +54,93 @@ Conditions:
       - ""
 
 Resources:
-  ## +---------------
-  ## | CodeStar
-  ## +---------------
-  MyScpBitBucketConnection:
-    Type: AWS::CodeStarConnections::Connection
+  ## +---------------------------------
+  ## | CodePipeline EventBridge Trigger
+  ## +---------------------------------
+  EventRole:
+    Type: AWS::IAM::Role
     Properties:
-      ConnectionName: MyBitBucketConnection
-      ProviderType: Bitbucket
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: eb-scp-pipeline-execution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource:
+                  !Join [
+                    "",
+                    [
+                      "arn:aws:codepipeline:",
+                      !Ref "AWS::Region",
+                      ":",
+                      !Ref "AWS::AccountId",
+                      ":",
+                      !Ref Pipeline,
+                    ],
+                  ]
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: "ScpPipelineChange"
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - "CodeCommit Repository State Change"
+        resources:
+          - !Join [
+              "",
+              [
+                "arn:aws:codecommit:",
+                !Ref "AWS::Region",
+                ":",
+                !Ref "AWS::AccountId",
+                ":",
+                !GetAtt ScpRepository.Name,
+              ],
+            ]
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - main
+      Targets:
+        - Arn:
+            !Join [
+              "",
+              [
+                "arn:aws:codepipeline:",
+                !Ref "AWS::Region",
+                ":",
+                !Ref "AWS::AccountId",
+                ":",
+                !Ref Pipeline,
+              ],
+            ]
+          RoleArn: !GetAtt EventRole.Arn
+          Id: codepipeline-TriggerScpPipeline
+
+  ## +----------------------------------------
+  ## | Repository (Scp Management)
+  ## +----------------------------------------
+  ScpRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryDescription: "Repository to control AWS SCPs and assignments"
+      RepositoryName: !Sub "${nameConvention}-repository"
 
   ## +---------------
   ## | CodePipeline
@@ -85,18 +156,16 @@ Resources:
       Stages:
         - Name: Source
           Actions:
-            # Example for sourcing from CodeStar/BitBucket
-            # CloudFormation cannot set up the OAuth pieces, so will need a one-off manual setup post-Stack deploy
-            - Name: SourceAction
+            - Name: Source
               ActionTypeId:
                 Category: Source
                 Owner: AWS
-                Version: 1
-                Provider: CodeStarSourceConnection
+                Version: "1"
+                Provider: CodeCommit
               Configuration:
-                ConnectionArn: !GetAtt MyScpBitBucketConnection.ConnectionArn
-                FullRepositoryId: !Sub "${bitBucketOrgName}/${bitBucketRepoName}"
+                RepositoryName: !GetAtt ScpRepository.Name
                 BranchName: !Ref branchName
+                PollForSourceChanges: false
               OutputArtifacts:
                 - Name: SourceArtifact
         - Name: Terraform
@@ -169,10 +238,13 @@ Resources:
         - PolicyName: !Sub ${nameConvention}-codepipeline-write
           PolicyDocument:
             Statement:
-              - Action:
-                  - codestar-connections:UseConnection
-                Resource: !GetAtt MyScpBitBucketConnection.ConnectionArn
+              - Sid: ReadRepo
                 Effect: Allow
+                Action:
+                  - codecommit:Get*
+                  - codecommit:GitPull
+                  - codecommit:UploadArchive
+                Resource: !GetAtt ScpRepository.Arn
               - !If
                 - BlankSNSTopic
                 - !Ref AWS::NoValue
@@ -180,6 +252,7 @@ Resources:
                   Action:
                     - "sns:Publish"
                   Resource: !Ref "snsTopicArn"
+                  Sid: NotifyManualApproval
               - Sid: CodeBuildAccess
                 Effect: Allow
                 Action:
