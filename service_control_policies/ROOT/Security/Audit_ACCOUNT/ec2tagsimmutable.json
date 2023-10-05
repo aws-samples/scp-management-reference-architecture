@@ -1,0 +1,29 @@
+{
+    "policy": {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Deny",
+                "Action": [
+                    "ec2:DeleteTags",
+                    "ec2:CreateTags"
+                ],
+                "Resource": [
+                    "*"
+                ],
+                "Condition": {
+                    "ForAnyValue:StringLike": {
+                        "aws:TagKeys": [
+                            "ou_name",
+                            "sub_env"
+                        ]
+                    },
+                    "ArnNotLike": {
+                        "aws:PrincipalArn": "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_TempProdCTFullAdmin-role_*"
+                    }
+                }
+            }
+        ]
+    },
+    "description": "ec2tagsimmutable"
+}

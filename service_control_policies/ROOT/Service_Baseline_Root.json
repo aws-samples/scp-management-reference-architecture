@@ -1,0 +1,52 @@
+{
+    "policy": {
+        "Statement": [
+            {
+                "Action": "ec2:RunInstances",
+                "Condition": {
+                    "StringNotEquals": {
+                        "ec2:MetadataHttpTokens": "required"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "arn:aws:ec2:*:*:instance/*",
+                "Sid": "RequireImdsV2"
+            },
+            {
+                "Action": "*",
+                "Condition": {
+                    "NumericLessThan": {
+                        "ec2:RoleDelivery": "2.0"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "*",
+                "Sid": "RequireAllEc2RolesToUseV2"
+            },
+            {
+                "Action": "ec2:ModifyInstanceMetadataOptions",
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "*",
+                "Sid": "AllowOnlyImdsAdminsToModifySettings"
+            },
+            {
+                "Action": "ec2:RunInstances",
+                "Condition": {
+                    "NumericGreaterThan": {
+                        "ec2:MetadataHttpPutResponseHopLimit": "1"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "arn:aws:ec2:*:*:instance/*",
+                "Sid": "MaxImdsHopLimit"
+            }
+        ],
+        "Version": "2012-10-17"
+    },
+    "description": "This SCP has policy statements to restrict how services can operate in the AWS Org at Root level."
+}

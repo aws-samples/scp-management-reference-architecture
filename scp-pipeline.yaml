@@ -1,0 +1,550 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this
+# software and associated documentation files (the "Software"), to deal in the Software
+# without restriction, including without limitation the rights to use, copy, modify,
+# merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Create a CI/CD pipeline for AWS Service Control Policy (SCP) Management"
+
+# Prerequisites
+# This template may be deployed in the management account or an account that has been given Organizations permission to operate as a delegated admin.
+# There is technically no 'Organizations' delegated administrator, though Organizations does allow for granular permissions sharing.
+# For an overview of the policy required to give "SCP delegated administrator" permissions, see https://medium.com/cloud-security/delegating-scp-management-to-governance-team-via-aws-organizations-53334a31b71c
+
+## +--------------
+## | Parameters
+## +--------------
+Parameters:
+  # Name of the project
+  nameConvention:
+    Description: "Prefix that will be used to name resources in this stack (e.g. roles, events, pipeline)"
+    Type: String
+    Default: scp
+  tfVersion:
+    Description: "Version of Terraform to use"
+    Type: String
+    Default: "1.5.6"
+  snsTopicArn:
+    Description: "SNS Topic ARN to notify for manual approvals"
+    Type: String
+    Default: ""
+  bitBucketOrgName:
+    Description: "Name of your BitBucket Organization"
+    Type: String
+    Default: "sirrombtest"
+  bitBucketRepoName:
+    Description: "Name of your BitBucket Repository"
+    Type: String
+    Default: "codestar_test"
+  terraformBucket:
+    Description: "Name of the bucket containing the Terraform state information"
+    Type: String
+    # Default: "iam-identitycenter-619254417006-tf-state"
+
+Conditions:
+  BlankSNSTopic:
+    Fn::Equals:
+      - !Ref snsTopicArn
+      - ""
+
+Resources:
+  ## +---------------
+  ## | CodeStar
+  ## +---------------
+  MyScpBitBucketConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: MyBitBucketConnection
+      ProviderType: Bitbucket
+
+  ## +---------------
+  ## | CodePipeline
+  ## +---------------
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PipelineRole.Arn
+      Name: !Sub "${nameConvention}-pipeline"
+      ArtifactStore:
+        Type: S3
+        Location: !Ref artifactsBucket
+      Stages:
+        - Name: Source
+          Actions:
+            # Example for sourcing from CodeStar/BitBucket
+            # CloudFormation cannot set up the OAuth pieces, so will need a one-off manual setup post-Stack deploy
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeStarSourceConnection
+              Configuration:
+                ConnectionArn: !GetAtt MyScpBitBucketConnection.ConnectionArn
+                FullRepositoryId: !Sub "${bitBucketOrgName}/${bitBucketRepoName}"
+                BranchName: master
+              OutputArtifacts:
+                - Name: SourceArtifact
+        - Name: Terraform
+          Actions:
+            # This action generates the Terraform manifest
+            - Name: ResolveAndPlan
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodebuildResolveAndPlanScps
+              RunOrder: 1
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: ScpPlanArtifact
+            - Name: ScpManualApproval
+              RunOrder: 2
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: "1"
+                Provider: Manual
+              Configuration:
+                NotificationArn:
+                  Fn::If:
+                    - BlankSNSTopic
+                    - !Ref "AWS::NoValue"
+                    - !Ref snsTopicArn
+            - Name: ScpApply
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodebuildScpApply
+              RunOrder: 3
+              InputArtifacts:
+                - Name: "ScpPlanArtifact"
+
+  ## +------------------------
+  ## | IAM Role (CodePipeline)
+  ## +------------------------
+  PipelineRole:
+    Type: "AWS::IAM::Role"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "ListAllMyBuckets requires * in Resource"
+          - id: W28
+            reason: "Fixed name required to future references"
+    Properties:
+      RoleName: !Sub ${nameConvention}-codepipeline-write
+      Description: "Role for code pipeline"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: !Sub ${nameConvention}-codepipeline-write
+          PolicyDocument:
+            Statement:
+              - Action:
+                  - codestar-connections:UseConnection
+                Resource: !GetAtt MyScpBitBucketConnection.ConnectionArn
+                Effect: Allow
+              - !If
+                - BlankSNSTopic
+                - !Ref AWS::NoValue
+                - Effect: Allow
+                  Action:
+                    - "sns:Publish"
+                  Resource: !Ref "snsTopicArn"
+              - Sid: CodeBuildAccess
+                Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource:
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${nameConvention}-*"
+              - Sid: S3AllAccess
+                Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                Resource:
+                  - "*"
+              - Sid: BucketPermissions
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetBucketPolicy
+                  - s3:GetObject
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                Resource:
+                  - !Sub "arn:aws:s3:::${artifactsBucket}/*"
+                  - !Sub "arn:aws:s3:::${artifactsBucket}*"
+                  # - !Sub "arn:aws:s3:::${S3BucketCodeBucket}/*"
+                  # - !Sub "arn:aws:s3:::${S3BucketCodeBucket}*"
+
+  ## +----------------------------------------
+  ## | CodeBuild Project (Template Validation)
+  ## +----------------------------------------
+  CodebuildResolveAndPlanScps:
+    Type: AWS::CodeBuild::Project
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W32
+            reason: "No relevant artifact produced in projects. S3 bucket is also encrypted with managed key"
+    Properties:
+      Name: !Sub ${nameConvention}-resolve-scps
+      ServiceRole: !GetAtt RoleCodebuildScp.Arn
+      EncryptionKey: !GetAtt KmsKeyS3.Arn
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: "aws/codebuild/amazonlinux2-x86_64-standard:3.0"
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: TF_VERSION
+            Value: !Ref tfVersion
+      Artifacts:
+        Type: CODEPIPELINE
+        ArtifactIdentifier: "ScpPlanArtifact"
+      TimeoutInMinutes: 480
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - echo "[INFO] [INSTALL] Installing Terraform"
+                - wget -q https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip
+                - unzip terraform_${TF_VERSION}_linux_amd64.zip -d /usr/bin/
+                - chmod +x /usr/bin/terraform
+                - echo "[INFO] [INSTALL] Installing finished"
+            build:
+              commands:
+                - chmod +x resolve_scp_data.py
+                - python3 resolve_scp_data.py
+                - terraform init
+                - terraform plan -out=scp_tf_plan.out
+          artifacts:
+            files:
+              - ./**/*
+              - /usr/bin/terraform
+
+  ## +---------------------------------------
+  ## | IAM Service Role (Template Validation)
+  ## +---------------------------------------
+  RoleCodebuildScp:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Requires * in Resource to get all policies"
+          - id: W28
+            reason: "Fixed name required to future references"
+    Properties:
+      RoleName: !Sub ${nameConvention}-codebuild-role
+      Description: "Service role for CodeBuild"
+      Policies:
+        - PolicyName: !Sub ${nameConvention}-codebuild-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CodeBuildAccess
+                Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource:
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${nameConvention}-*"
+              - Sid: Logs
+                Effect: Allow
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${nameConvention}*:*"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+              - Sid: ArtifactBucket
+                Effect: Allow
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:GetBucketAcl"
+                  - "s3:GetBucketLocation"
+                Resource:
+                  - !Sub "arn:aws:s3:::${artifactsBucket}*/*"
+              - Sid: TerraformBucket
+                Effect: Allow
+                Action:
+                  - "s3:ListBucket"
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:DeleteObject"
+                Resource:
+                  - !Sub "arn:aws:s3:::${terraformBucket}/*"
+                  - !Sub "arn:aws:s3:::${terraformBucket}"
+              - Sid: TerraformLockTable
+                Effect: Allow
+                Action:
+                  - "dynamodb:GetItem"
+                  - "dynamodb:PutItem"
+                  - "dynamodb:DeleteItem"
+                Resource:
+                  - "arn:aws:dynamodb:*:*:table/tf-state-lock"
+              - Sid: CodeBuild
+                Effect: Allow
+                Action:
+                  - "codebuild:CreateReportGroup"
+                  - "codebuild:CreateReport"
+                  - "codebuild:UpdateReport"
+                  - "codebuild:BatchPutTestCases"
+                  - "codebuild:BatchPutCodeCoverages"
+                Resource:
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${nameConvention}*"
+              - Sid: SpecificPermissions
+                Effect: Allow
+                Action:
+                  - access-analyzer:ValidatePolicy
+                  - iam:GetPolicy
+                Resource:
+                  - "*"
+              - Sid: KMSPermission
+                Effect: Allow
+                Action:
+                  - "kms:Encrypt"
+                  - "kms:Decrypt"
+                  - "kms:ReEncrypt*"
+                  - "kms:GenerateDataKey*"
+                  - "kms:DescribeKey"
+                Resource:
+                  - !GetAtt KmsKeyS3.Arn
+              - Sid: DescribeOrg
+                Effect: Allow
+                Action:
+                  - "organizations:DescribeOrganization"
+                  - "organizations:DescribeOrganizationalUnit"
+                  - "organizations:DescribeAccount"
+                  - "organizations:DescribePolicy"
+                  - "organizations:DescribeEffectivePolicy"
+                  - "organizations:ListRoots"
+                  - "organizations:ListOrganizationalUnitsForParent"
+                  - "organizations:ListParents"
+                  - "organizations:ListChildren"
+                  - "organizations:ListAccounts"
+                  - "organizations:ListAccountsForParent"
+                  - "organizations:ListPolicies"
+                  - "organizations:ListPoliciesForTarget"
+                  - "organizations:ListTargetsForPolicy"
+                  - "organizations:ListTagsForResource"
+                Resource:
+                  - "*"
+              - Sid: UpdateSCPsAndAttachments
+                Effect: Allow
+                Action:
+                  - "organizations:CreatePolicy"
+                  - "organizations:UpdatePolicy"
+                  - "organizations:DeletePolicy"
+                  - "organizations:AttachPolicy"
+                  - "organizations:DetachPolicy"
+                  - "organizations:EnablePolicyType"
+                  - "organizations:DisablePolicyType"
+                Resource:
+                  - "arn:aws:organizations::*:policy/*/service_control_policy/*"
+                  - "arn:aws:organizations::*:account/*/*"
+                  - "arn:aws:organizations::*:ou/*/*"
+                  - "arn:aws:organizations::*:root/*/*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+
+  ## +-----------------------------------
+  ## | CodeBuild Project (Permission Set Plan)
+  ## +-----------------------------------
+  CodebuildScpApply:
+    Type: AWS::CodeBuild::Project
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W32
+            reason: "No relevant artifact produced in projects. S3 bucket is also encrypted with managed key"
+    Properties:
+      Name: !Sub ${nameConvention}-scp-apply
+      ServiceRole: !GetAtt RoleCodebuildScp.Arn
+      EncryptionKey: !GetAtt KmsKeyS3.Arn
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: "aws/codebuild/amazonlinux2-x86_64-standard:3.0"
+        Type: LINUX_CONTAINER
+        # EnvironmentVariables:
+        # - Name: TF_VERSION
+        #   Value: !Ref tfVersion
+      Artifacts:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 480
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - echo "[INFO] [INSTALL] NOT Installing Terraform (apply should source it from the Plan Artifact)"
+                - # wget -q https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip
+                - # unzip terraform_${TF_VERSION}_linux_amd64.zip -d /usr/bin/
+                - # chmod +x ./usr/bin/terraform
+            build:
+              commands:
+                - ./usr/bin/terraform init
+                - ./usr/bin/terraform apply -auto-approve scp_tf_plan.out
+
+  ## +-------------------
+  ## | S3 Bucket Artifact
+  ## +-------------------
+  artifactsBucket:
+    Type: "AWS::S3::Bucket"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: "There is no need to enable logging in this bucket."
+    Properties:
+      BucketName: !Sub ${nameConvention}-${AWS::AccountId}-artfcs
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "aws:kms"
+              KMSMasterKeyID: !Ref KmsKeyS3
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  localBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref artifactsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: HTTPSOnly
+            Effect: Deny
+            Principal:
+              AWS: "*"
+            Action:
+              - s3:*
+            Resource:
+              - !Sub arn:aws:s3:::${artifactsBucket}/*
+              - !Sub arn:aws:s3:::${artifactsBucket}
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  KmsKeyAliasS3:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/${nameConvention}/s3"
+      TargetKeyId: !Ref KmsKeyS3
+
+  KmsKeyS3:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS Key for S3
+      Enabled: True
+      EnableKeyRotation: true
+      KeyUsage: ENCRYPT_DECRYPT
+      KeyPolicy:
+        {
+          "Version": "2012-10-17",
+          "Id": "s3-kms-policy",
+          "Statement":
+            [
+              {
+                "Sid": "Enable IAM User Permissions",
+                "Effect": "Allow",
+                "Principal":
+                  { "AWS": !Sub "arn:aws:iam::${AWS::AccountId}:root" },
+                "Action":
+                  [
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:CreateGrant",
+                    "kms:DescribeKey",
+                  ],
+                "Resource": "*",
+                "Condition":
+                  {
+                    "StringEquals":
+                      {
+                        "kms:CallerAccount": !Sub "${AWS::AccountId}",
+                        "kms:ViaService": !Sub "s3.${AWS::Region}.amazonaws.com",
+                      },
+                  },
+              },
+              {
+                "Sid": "Allow direct access to key metadata to the account",
+                "Effect": "Allow",
+                "Principal":
+                  { "AWS": !Sub "arn:aws:iam::${AWS::AccountId}:root" },
+                "Action":
+                  ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
+                "Resource": "*",
+              },
+              {
+                "Sid": "Allow access for Key Administrators",
+                "Effect": "Allow",
+                "Principal":
+                  { "AWS": [!Sub "arn:aws:iam::${AWS::AccountId}:root"] },
+                "Action":
+                  [
+                    "kms:Create*",
+                    "kms:Describe*",
+                    "kms:Enable*",
+                    "kms:List*",
+                    "kms:Put*",
+                    "kms:Update*",
+                    "kms:Revoke*",
+                    "kms:Disable*",
+                    "kms:Get*",
+                    "kms:Delete*",
+                    "kms:TagResource",
+                    "kms:UntagResource",
+                    "kms:ScheduleKeyDeletion",
+                    "kms:CancelKeyDeletion",
+                  ],
+                "Resource": "*",
+              },
+            ],
+        }

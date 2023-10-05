@@ -1,0 +1,110 @@
+{
+    "policy": {
+        "Statement": [
+            {
+                "Action": [
+                    "guardduty:AcceptInvitation",
+                    "guardduty:ArchiveFindings",
+                    "guardduty:CreateDetector",
+                    "guardduty:CreateFilter",
+                    "guardduty:CreateIPSet",
+                    "guardduty:CreateMembers",
+                    "guardduty:CreatePublishingDestination",
+                    "guardduty:CreateSampleFindings",
+                    "guardduty:CreateThreatIntelSet",
+                    "guardduty:DeclineInvitations",
+                    "guardduty:Delete*",
+                    "guardduty:Disassociate*",
+                    "guardduty:InviteMembers",
+                    "guardduty:StartMonitoringMembers",
+                    "guardduty:StopMonitoringMembers",
+                    "guardduty:TagResource",
+                    "guardduty:UnarchiveFindings",
+                    "guardduty:UntagResource",
+                    "guardduty:UpdateDetector",
+                    "guardduty:UpdateFilter",
+                    "guardduty:UpdateFindingsFeedback",
+                    "guardduty:UpdateIPSet",
+                    "guardduty:UpdatePublishingDestination",
+                    "guardduty:UpdateThreatIntelSet"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": [
+                            "arn:aws:iam::*:role/AWSControlTowerExecution",
+                            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_SECURITYROLE_*"
+                        ]
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": [
+                    "*"
+                ],
+                "Sid": "DenyDisruptGuardDuty"
+            },
+            {
+                "Action": [
+                    "securityhub:AcceptInvitation",
+                    "securityhub:BatchDisableStandards",
+                    "securityhub:CreateActionTarget",
+                    "securityhub:CreateInsight",
+                    "securityhub:CreateMembers",
+                    "securityhub:DeclineInvitations",
+                    "securityhub:Delete*",
+                    "securityhub:Disable*",
+                    "securityhub:Disassociate*",
+                    "securityhub:EnableImportFindingsForProduct",
+                    "securityhub:InviteMembers",
+                    "securityhub:TagResource",
+                    "securityhub:UntagResource",
+                    "securityhub:Update*"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": [
+                            "arn:aws:iam::*:role/AWSControlTowerExecution",
+                            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_SECURITYROLE_*"
+                        ]
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": [
+                    "*"
+                ],
+                "Sid": "DenyDisruptSecurityHub"
+            },
+            {
+                "Action": [
+                    "cloudwatch:DeleteAlarms",
+                    "cloudwatch:DeleteDashboards",
+                    "cloudwatch:DisableAlarmActions"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "*",
+                "Sid": "DenyDeletingCloudWatchAlarmsDashboards"
+            },
+            {
+                "Action": [
+                    "ec2:DeleteFlowLogs",
+                    "logs:DeleteLogGroup",
+                    "logs:DeleteLogStream"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "*",
+                "Sid": "DenyDeletingVPCFlowLogs"
+            }
+        ],
+        "Version": "2012-10-17"
+    },
+    "description": "This SCP has policy statements to restrict account baselining actions in all top-level OUs of the AWS Org, including service allowlist and region allowlist"
+}

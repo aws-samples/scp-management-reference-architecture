@@ -12,7 +12,7 @@ resource "aws_organizations_policy" "create_scp" {
 
 # Resource to attach the above created SCP to a specifc Target (that can be Root OU or any individual OU or AWS Account)
 resource "aws_organizations_policy_attachment" "attach_scp" {
-  count     = length(var.scp_target_list) != 0 ? 1 : 0 # check if an SCP target is passed from the calling module then only this resource block will be executed
+  for_each = toset(var.scp_target_list)
   policy_id = aws_organizations_policy.create_scp.id
-  target_id = var.scp_target_list[count.index]
+  target_id = each.key
 }

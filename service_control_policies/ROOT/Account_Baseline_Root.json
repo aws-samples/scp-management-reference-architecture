@@ -1,0 +1,83 @@
+{
+    "policy": {
+        "Statement": [
+            {
+                "Action": [
+                    "iam:CreateUser",
+                    "iam:CreateAccessKey"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": [
+                    "*"
+                ],
+                "Sid": "DenyIAMUserANDAccessKeyCreation"
+            },
+            {
+                "Action": [
+                    "s3:PutAccountPublicAccessBlock"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": [
+                            "arn:aws:iam::*:role/AWSControlTowerExecution"
+                        ]
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": [
+                    "*"
+                ],
+                "Sid": "DenyDisableS3PublicAccessBlock"
+            },
+            {
+                "Action": [
+                    "ec2:AttachInternetGateway",
+                    "ec2:CreateInternetGateway",
+                    "ec2:CreateEgressOnlyInternetGateway",
+                    "ec2:CreateNatGateway",
+                    "ec2:CreateVpcPeeringConnection",
+                    "ec2:AcceptVpcPeeringConnection",
+                    "globalaccelerator:Create*",
+                    "globalaccelerator:Update*"
+                ],
+                "Condition": {
+                    "ArnNotLike": {
+                        "aws:PrincipalARN": "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*"
+                    }
+                },
+                "Effect": "Deny",
+                "Resource": "*",
+                "Sid": "DenyMakingVPCsInternetAccessible"
+            },
+            {
+                "Condition": {
+                    "StringLike": {
+                        "aws:PrincipalArn": [
+                            "arn:aws:iam::*:root"
+                        ]
+                    }
+                },
+                "Effect": "Deny",
+                "NotAction": [
+                    "iam:EnableMFADevice",
+                    "iam:DeactivateMFADevice",
+                    "iam:CreateVirtualMFADevice",
+                    "iam:ListMFADevices",
+                    "iam:ResyncMFADevice",
+                    "aws-portal:ViewAccount",
+                    "aws-portal:ModifyAccount",
+                    "account:ListRegions"
+                ],
+                "Resource": "*",
+                "Sid": "PartiallyRestrictedRoot"
+            }
+        ],
+        "Version": "2012-10-17"
+    },
+    "description": "This SCP has policy statements to restrict account baselining and compliance actions in the AWS Org at Root level."
+}
