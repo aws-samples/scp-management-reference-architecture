@@ -463,7 +463,7 @@ Resources:
               - "sts:AssumeRole"
 
   ## +-----------------------------------
-  ## | CodeBuild Project (Permission Set Plan)
+  ## | CodeBuild Project (SCP Apply)
   ## +-----------------------------------
   CodebuildScpApply:
     Type: AWS::CodeBuild::Project
