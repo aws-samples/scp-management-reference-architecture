@@ -99,7 +99,10 @@ This document explains how to automatically create IaC from manually-managed SCP
            "codepipeline:CreatePipeline",
            "codepipeline:DeletePipeline"
          ],
-         "Resource": "arn:aws:codepipeline:*:*:scp-pipeline"
+         "Resource": [
+            "arn:aws:codepipeline:*:*:scp-pipeline",
+            "arn:aws:codepipeline:*:*:scp-pipeline/*"
+         ]
        },
        {
          "Effect": "Allow",
