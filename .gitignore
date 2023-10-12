@@ -1,3 +1,6 @@
+# Do not upload the automatically generated code to Git
+scp_define_attach_auto.tf
+
 **/.terraform/*
 
 # .tfstate files

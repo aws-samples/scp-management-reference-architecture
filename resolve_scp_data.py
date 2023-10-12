@@ -23,6 +23,7 @@ import re
 SCP_FOLDER = "service_control_policies"
 CHILD_TYPES = ["ORGANIZATIONAL_UNIT", "ACCOUNT"]
 ACCOUNT_SUFFIX = "_ACCOUNT"  # Differentiates OU folders vs Account folders
+OUTPUT_FILE = "scp_define_attach_auto.tf"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,7 +46,7 @@ def get_scp_attachments(current_target_id, current_path, data_dict, org_client):
             data_dict[base_name]["targets"].append(current_target_id)
         else:
             data_dict[base_name] = {
-                "path": f"service_control_policies/SHARED/{base_name}.json",
+                "path": f"{SCP_FOLDER}/SHARED/{base_name}.json",
                 "targets": [current_target_id],
             }
     # Get all child OUs and Accounts
@@ -130,7 +131,7 @@ def main():
         org_client=org_client,
     )
     # Write the Terraform manifest
-    with open("scp_define_attach_auto.tf", "w") as f:
+    with open(OUTPUT_FILE, "w") as f:
         for scp_entry in data_dict:
             scp_policy_path = data_dict[scp_entry]["path"]
             scp_target_list = data_dict[scp_entry]["targets"]
