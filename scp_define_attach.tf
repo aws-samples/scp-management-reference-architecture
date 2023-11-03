@@ -72,8 +72,8 @@ module "network_baseline_infraOU_scp" {
   source          = "./scp_module"
   scp_name        = "Network_Baseline_ProdInfrastructureOU"
   scp_desc        = "This SCP has policy statements to restrict privilege VPC and EC2 baselining actions only in Infrastructure OU of your AWS Org."
-  scp_policy      = jsonencode(jsondecode(templatefile("./service_control_policies/Production_Infrastructure/Network_Baseline_InfrastructureOU.json.tpl", { master_account_id = data.aws_organizations_organization.ou_model.master_account_id })))
-  scp_target_list = [var.production_infrastructure_id]
+  scp_policy      = jsonencode(jsondecode(templatefile("./service_control_policies/InfrastructureOU/Network_Baseline_InfrastructureOU.json.tpl", { master_account_id = data.aws_organizations_organization.ou_model.master_account_id })))
+  scp_target_list = [var.infrastructure_id]
 }
 
 ##############################################################################
@@ -104,5 +104,5 @@ output "network_baseline_vpcboundaries_scp_byte_length" {
 }
 
 output "network_baseline_infraOU_scp_byte_length" {
-  value = module.module.network_baseline_infraOU_scp.scp_byte_size
+  value = module.network_baseline_infraOU_scp.scp_byte_size
 }
