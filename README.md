@@ -82,10 +82,10 @@ This repo contains the AWS Service Control Policies (SCPs) custom built for your
 
 ### SCP File Names for Multiple OUs:
 
-- Account_Baseline_<Logical Keyword>.json.tpl
-- Security_Baseline_<Logical Keyword>.json.tpl
-- Infrastructure_Baseline_<Logical Keyword>.json.tpl
-- Storage_Baseline_<Logical Keyword>.json.tpl
+- Account_Baseline_*Logical Keyword*.json.tpl
+- Security_Baseline_*Logical Keyword*.json.tpl
+- Infrastructure_Baseline_*Logical Keyword*.json.tpl
+- Storage_Baseline_*Logical Keyword*.json.tpl
   > This logical keyword should define the logical grouping of multiple OUs you have planned for applying the SCP statements. **For example**, if you have a set of VPC and EC2 restrictions that you want to put on all non-infrastructure OUs then your SCP file name can be `Network_Baseline_NonInfraOUs.json.tpl`
 
 ### SCP File Names for any specific OU:
