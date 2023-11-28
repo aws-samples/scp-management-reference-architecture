@@ -32,8 +32,7 @@ This repo contains the AWS Service Control Policies (SCPs) custom built for your
 ├── terraform.tfvars         # <-- pass values to variables before execution through this file
 ├── service_control_policies # <-- a directory with sub-directories specific to the OUs to which SCPs are directly attached
     ├── Root                      # <-- all SCP policies to be attached directly to Root
-    ├── Production_Infrastructure # <-- all SCP policies to be attached directly to Production_Infrastructure OU
-    ├── Quarantine                # <-- all SCP policies to be attached directly to the Quarantine OU
+    ├── InfrastructureOU          # <-- all SCP policies to be attached directly to Production_Infrastructure OU
     ├── MultiOUs                  # <-- all SCP policies to be attached directly to the list of multiple OUs.
                                   #     To check the list, refer to .tfvars files in terraform directory.
                                   #     Look for variables whose name is similar to the last keyword of the SCP policy
@@ -78,14 +77,14 @@ This repo contains the AWS Service Control Policies (SCPs) custom built for your
 
 - Account_Baseline_Root.json.tpl
 - Security_Baseline_Root.json.tpl
-- Network_Baseline_Root.json.tpl
+- Infrastructure_Baseline_Root.json.tpl
 - Storage_Baseline_Root.json.tpl
 
 ### SCP File Names for Multiple OUs:
 
 - Account*Baseline*_Logical Keyword_.json.tpl
 - Security*Baseline*_Logical Keyword_.json.tpl
-- Network*Baseline*_Logical Keyword_.json.tpl
+- Infrastructure*Baseline*_Logical Keyword_.json.tpl
 - Storage*Baseline*_Logical Keyword_.json.tpl
   > This logical keyword should define the logical grouping of multiple OUs you have planned for applying the SCP statements. **For example**, if you have a set of VPC and EC2 restrictions that you want to put on all non-infrastructure OUs then your SCP file name can be `Network_Baseline_NonInfraOUs.json.tpl`
 
@@ -100,7 +99,7 @@ This repo contains the AWS Service Control Policies (SCPs) custom built for your
 
 - Account*Baseline*_Account Name or ID_.json.tpl
 - Security*Baseline*_Account Name or ID_.json.tpl
-- Network*Baseline*_Account Name or ID_.json.tpl
+- Infrastructure*Baseline*_Account Name or ID_.json.tpl
 - Storage*Baseline*_Account Name or ID_.json.tpl
 
 # Steps to manage SCPs
@@ -116,7 +115,7 @@ This repo contains the AWS Service Control Policies (SCPs) custom built for your
 2.  Based on the target chosen for your SCP navigate to the appropriate sub-directory, next identify under what category does your new SCP policy actions belong out of the below mentioned four catgeories.
     - `account_baseline_scp` - choose this category if yor policy actions are specific to governance or account management services
     - `security_iam_baseline_scp` - choose this category if yor policy actions are specific to security services
-    - `network_baseline_scp` - choose this category if yor policy actions are specific to network services
+    - `infrastructure_baseline_scp` - choose this category if yor policy actions are specific to network services
     - `storage_logging_baseline_scp` - choose this category if yor policy actions are specific to storage services
 3.  Next, check if an SCP file with a name similar to your above chosen SCP category exist in the sub-directory you have decided as your SCP target.
     - If you find an existing file with a name similar to your above chosen SCP category then edit the identified SCP file, either add your actions to an existing statement or create a new statement in the policy file based on the SCP policy size limit and your requirements. Go to Step 4.
