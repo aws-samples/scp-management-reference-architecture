@@ -20,21 +20,21 @@ All SCP policies that fall under the SCP category - Account Baseline, are define
                                 
 ---
 
-## List of Network Baseline SCPs
+## List of Infrastrcuture Baseline SCPs
 
-All SCP policies that fall under the SCP category - Network Baseline, are defined in the list below.
+All SCP policies that fall under the SCP category - Infrastructure Baseline, are defined in the list below.
 
 > NOTE: While designing these SCPs we have considered Infrastcruture OU as the dedicated OU created to host the adminsitrative accounts where networking services are built and managed for the entire organization.
 
 | SCP Name                              | Policy Statements in the SCP                                                                           | Applicable Resources | Applicable OUs / Accounts                                     | Role Exemptions                                                                                                                                                                       | Other Conditions |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Network_Baseline_Root                 | Prevent Creating Default VPC and Subnet and Classic VPC Links                                          | All (\*)             | Root                                                          |                                                                                                                                                                                       |                  |
+| Infrastructure_Baseline_Root                 | Prevent Creating Default VPC and Subnet and Classic VPC Links                                          | All (\*)             | Root                                                          |                                                                                                                                                                                       |                  |
 |                                       | Enforce use of IMDSv2 for instance creation                                                            | All EC2 Instances    | Root | |                  |
 |                                       | Prevent removal of IMDSv2                                                                              | All EC2 Instances    | Root  |   |                  |
 |                                       | Prevent VPC privilege actions                                                                          | All (\*)             | Root                                                          | | |
-| Network_Baseline_VPCBoundaries        | Prevent broad list of privilege VPC and EC2 Actions                                                    | All (\*)             | All OUs except Infrastructure OU | | |
+| Infrastructure_Baseline_VPCBoundaries        | Prevent broad list of privilege VPC and EC2 Actions                                                    | All (\*)             | All OUs except Infrastructure OU | | |
 |                                       | Prevent write actions for DirectConnect, Global Accelerator, CloudFront, Internet gateway, VPC Peering | All (\*)             | All OUs except Infrastructure OU    |                                                                                                                                                                                       |                  |
-| Network_Baseline_InfrastructureOU | Prevent DHCP options, Subnet CIDR, Network ACLs, Route Table edit actions                              | All (\*)             | Infrastructure OU                                  |  |                  |
+| Infrastructure_Baseline_InfrastructureOU | Prevent DHCP options, Subnet CIDR, Network ACLs, Route Table edit actions                              | All (\*)             | Infrastructure OU                                  |  |                  |
 |                                       |                                                                                                        |                      |                                                               |                                                                                                                                                                                       |                  |
 
 ---
