@@ -15,7 +15,6 @@ All SCP policies that fall under the SCP category - Account Baseline, are define
 |                                  | Prevent account region enable and disable                         | All (\*)               | Root                                                  |                                                                           |                                               |
 |                                  | Prevent billing modification                                      | All (\*)               | Root                                                  |                                                                                                                            |                                               |
 |                                  | Prevent specific tag modifications                                | All (\*)               | Root                                                  |                                                                                                                            |  |
-|
 | Account_Baseline_AllowedServices (Multi OU)| Deny any AWS service usage outside the approved list              | All (\*)               | All OUs except Testing OUs (like Sandbox) OU |||
                                 
 ---
