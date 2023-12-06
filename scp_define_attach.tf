@@ -38,11 +38,11 @@ module "security_baseline_root_scp" {
   scp_target_list = [var.root_id]
 }
 
-module "storage_baseline_root_scp" {
+module "data_baseline_root_scp" {
   source          = "./scp_module"
-  scp_name        = "Storage_Baseline_Root"
-  scp_desc        = "This SCP has policy statements to restrict storage baselining actions in your AWS Org at Root level."
-  scp_policy      = jsonencode(jsondecode(templatefile("./service_control_policies/Root/Storage_Baseline_Root.json.tpl", { master_account_id = data.aws_organizations_organization.ou_model.master_account_id })))
+  scp_name        = "Data_Baseline_Root"
+  scp_desc        = "This SCP has policy statements to restrict data storage baselining actions in your AWS Org at Root level."
+  scp_policy      = jsonencode(jsondecode(templatefile("./service_control_policies/Root/Data_Baseline_Root.json.tpl", { master_account_id = data.aws_organizations_organization.ou_model.master_account_id })))
   scp_target_list = [var.root_id]
 }
 
@@ -91,8 +91,8 @@ output "security_baseline_root_scp_byte_length" {
   value = module.security_baseline_root_scp.scp_byte_size
 }
 
-output "storage_baseline_root_scp_byte_length" {
-  value = module.storage_baseline_root_scp.scp_byte_size
+output "data_baseline_root_scp_byte_length" {
+  value = module.data_baseline_root_scp.scp_byte_size
 }
 
 output "account_baseline_allowedservices_scp_byte_length" {

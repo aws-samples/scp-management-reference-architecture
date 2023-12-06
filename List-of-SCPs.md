@@ -58,15 +58,15 @@ All SCP policies that fall under the SCP category - Security Baseline, are defin
 
 ---
 
-## List of Storage Baseline SCPs
+## List of Data Baseline SCPs
 
-> **Pre-requisite** - A service enablement is requested before deploying the storage baseline SCPs - **Configure S3 service block public access at account level** so that any bucket created in S3 will have public access blocked by default
+> **Pre-requisite** - A service enablement is requested before deploying the data baseline SCPs - **Configure S3 service block public access at account level** so that any bucket created in S3 will have public access blocked by default
 
-All SCP policies that are defined in any of the Storage Baseline SCP files, should be defined in the below list
+All SCP policies that are defined in any of the Data Baseline SCP files, should be defined in the below list
 
 | SCP Name              | Policy Statements in the SCP                         | Applicable Resources                   | Applicable OUs / Accounts | Role Exemptions                                                                                                                                                           | Other Conditions |
 | --------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Storage_Baseline_Root | Prevent deletion of critical buckets and its objects | Place holder for critical bucket names | Root                      | |                  |
+| Data_Baseline_Root | Prevent deletion of critical buckets and its objects | Place holder for critical bucket names | Root                      | |                  |
 |                       | Prevent S3 public access                             | All (\*)                               | Root                      | |                  |
 |                       | Prevent disabling EBS encryption                     | All (\*)                               | Root                      | |                  |
 |                       | Prevent creation of unencrypted RDS instances        | All (\*)                               | Root                      | |                  |
