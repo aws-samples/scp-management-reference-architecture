@@ -1,10 +1,15 @@
 """
 Summary
     This script is a useful starting point if you have manually-managed SCPs that you want to migrate to IaC.
-    This script will parse the OU structure and create SCP JSONs in a local representation of the OU structure
-    It will also generate import files to be used by Terraform
+    This script will parse the OU structure and create SCP JSONs in a local representation of the OU structure.
+    It will also generate import files to be used by Terraform, unless specified otherwise.
+
+    This script can also be used to refresh the OU structure to make it easier to add new SCP attachments.
+    To run this script to just refresh the OU structure and not make SCP updates or generate imports, run:
+    python generate_scp_ou_structure_and_imports.py --skip-import-creation --skip-customer-scp-refresh
 """
 
+import argparse
 import boto3
 from collections import Counter
 import json
@@ -52,8 +57,22 @@ def get_all_scp_attachments(ou_id):
 
 
 def get_child_ou_and_scps(
-    ou_id, starting_folder, all_attachments_counter, attachment_dict: dict = {}
+    ou_id,
+    starting_folder,
+    all_attachments_counter,
+    skip_import_creation,
+    skip_customer_scp_refresh,
+    attachment_dict: dict = {},
 ):
+    """
+    Walks through each OU/account in the Organization and
+
+    This function will write files to disk in the folder structure within service_control_policies directory.
+
+
+    Returns a dictionary of SCP attachments with each key representing an SCP (an SCP can be attached to multiple OUs).
+    This return value can be used for troubleshooting purposes.
+    """
     # Get OU Information -- OU here is root, OU, or account
     # Special case for root
     if re.match(r"r-", ou_id):
@@ -80,41 +99,58 @@ def get_child_ou_and_scps(
     # Save attached SCPs as JSON files
     for scp in attached_scps["Policies"]:
         # Skip FullAWSAccess SCP and AWS Guardrails SCPs
-        if scp["Name"] == "FullAWSAccess" or re.match(r"aws-guardrails", scp["Name"]):
-            continue  # Skip FullAWSAccess SCP"
+        if scp["Name"] == "FullAWSAccess":
+            print(f"Adding Full AWS Access placeholder to {ou_path}")
+            with open(os.path.join(ou_path, "FullAWSAccess.placeholder"), "w") as f:
+                f.write("# Placeholder for FullAWSAccess")
+            continue
         scp_id = scp["Id"]
         scp_name = scp["Name"]
         # Get description but fall back to name if blank
         scp_description = scp["Description"]
         if scp_description == "":
             scp_description = scp_name
-        if (
+        if re.match(r"aws-guardrails", scp["Name"]):
+            target_path = os.path.join(ou_path, f"{scp_name}.guardrail")
+            print(f"Adding Control Tower guardrail placeholder to {target_path}")
+            with open(target_path, "w") as f:
+                f.write(
+                    f"# This is a placeholder for the Control Tower Guardrail SCP {scp_name}"
+                )
+            continue
+        elif (
             scp_name in all_attachments_counter
             and all_attachments_counter[scp_name] > 1
+            and not skip_customer_scp_refresh
         ):
             target_path = os.path.join(OUTPUT_FOLDER, "SHARED", f"{scp_name}.json")
             placeholder = os.path.join(ou_path, f"{scp_name}.shared")
+            print(f"Adding shared placeholder for {scp_name} to {target_path}")
             with open(placeholder, "w") as f:
                 f.write(f"# This is a placeholder for shared SCP {scp_name}")
         else:
             target_path = os.path.join(ou_path, f"{scp_name}.json")
+        if skip_customer_scp_refresh:
+            continue
         scp_document = org_client.describe_policy(PolicyId=scp_id)["Policy"]["Content"]
         scp_document_to_print = {
             "policy": json.loads(scp_document),
             "description": scp_description,
         }
         scp_json = json.dumps(scp_document_to_print, indent=4)
+        print(f"Writing SCP to {target_path}")
         with open(target_path, "w") as f:
             f.write(scp_json)
-        with open(IMPORT_POLICY_ATTACHMENTS_TF, "a") as f:
-            f.write(
-                f"""
+        if not skip_import_creation:
+            with open(IMPORT_POLICY_ATTACHMENTS_TF, "a") as f:
+                f.write(
+                    f"""
 import {{
   to = module.{scp_name}.aws_organizations_policy_attachment.attach_scp["{ou_id}"]
   id = "{ou_id}:{scp_id}"
 }}
 """
-            )
+                )
         if attachment_dict.get(scp_name) is None:
             attachment_dict[scp_name] = {}
             attachment_dict[scp_name] = {
@@ -126,25 +162,18 @@ import {{
         else:
             attachment_dict[scp_name]["scp_target_list"].append(ou_id)
 
-    # Recursively process child OUs
+    # Recursively process child OUs and accounts
     if not re.match(r"\d{12}", ou_id):
         child_ous = org_client.list_organizational_units_for_parent(ParentId=ou_id)
         child_accounts = org_client.list_accounts_for_parent(ParentId=ou_id)
-        for child_ou in child_ous["OrganizationalUnits"]:
+        for child in child_ous["OrganizationalUnits"] + child_accounts["Accounts"]:
             attachment_dict.update(
                 get_child_ou_and_scps(
-                    child_ou["Id"],
+                    child["Id"],
                     starting_folder=ou_path,
                     all_attachments_counter=all_attachments_counter,
-                    attachment_dict=attachment_dict,
-                )
-            )
-        for child_account in child_accounts["Accounts"]:
-            attachment_dict.update(
-                get_child_ou_and_scps(
-                    child_account["Id"],
-                    starting_folder=ou_path,
-                    all_attachments_counter=all_attachments_counter,
+                    skip_import_creation=skip_import_creation,
+                    skip_customer_scp_refresh=skip_customer_scp_refresh,
                     attachment_dict=attachment_dict,
                 )
             )
@@ -153,21 +182,32 @@ import {{
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Generate SCP structure and import manifest"
+    )
+    parser.add_argument(
+        "--skip-customer-scp-refresh",
+        help="If specified, will leave customer SCPs alone and only refresh the externally managed (Control Tower guardrails and FullAWSAccess) SCPs",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--skip-import-creation",
+        help="If specified, will not create any import files during the script execution. Useful for refreshes of CT and FullAWSAccess SCPs",
+        action="store_true",
+    )
+    args = parser.parse_args()
+    skip_customer_scp_refresh = args.skip_customer_scp_refresh
+    skip_import_creation = args.skip_import_creation
     # Create the output folder
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     os.makedirs(os.path.join(OUTPUT_FOLDER, "SHARED"), exist_ok=True)
-    # Commenting out the manifest files as the resolve_scp_data.py file will generate them instead
-    #     with open(SCP_TERRAFORM_MANIFEST, "w") as f:
-    #         f.write(
-    #             f"""# This file was automatically generated by {os.path.basename(__file__)} and may require manual review
-    # """
-    #         )
 
-    with open(IMPORT_POLICY_ATTACHMENTS_TF, "w") as f:
-        f.write(
-            f"""# This file was automatically generated by {os.path.basename(__file__)} and may require manual review
-"""
-        )
+    if not skip_import_creation:
+        with open(IMPORT_POLICY_ATTACHMENTS_TF, "w") as f:
+            f.write(
+                f"""# This file was automatically generated by {os.path.basename(__file__)} and may require manual review
+    """
+            )
     # Get a list of all existing SCPs in the Organization
     response = org_client.list_policies(Filter="SERVICE_CONTROL_POLICY")
     all_policies = response["Policies"]
@@ -187,21 +227,22 @@ if __name__ == "__main__":
         )
     ]
 
-    with open("import_policies.tf", "w") as f:
-        logging.info("Generating policy import manifest...")
-        for policy in all_policies:
-            policy_id = policy["Id"]
-            policy_name = policy["Name"]
-            module_name = policy_name.replace(" ", "_")
-            f.write(
-                f"""
+    if not skip_import_creation:
+        with open("import_policies.tf", "w") as f:
+            logging.info("Generating policy import manifest...")
+            for policy in all_policies:
+                policy_id = policy["Id"]
+                policy_name = policy["Name"]
+                module_name = policy_name.replace(" ", "_")
+                f.write(
+                    f"""
 import {{
     to = module.{module_name}.aws_organizations_policy.create_scp
     id = "{policy_id}"
 }}
-        """
-            )
-        # json.dumps(all_policies, f, indent=4)
+"""
+                )
+
     all_policy_names = [policy["Name"] for policy in all_policies]
 
     # Get the root of the organization tree
@@ -213,29 +254,12 @@ import {{
     all_attachments = get_child_ou_and_scps(
         ou_id=root_id,
         starting_folder=OUTPUT_FOLDER,
+        skip_import_creation=skip_import_creation,
+        skip_customer_scp_refresh=skip_customer_scp_refresh,
         all_attachments_counter=all_attachments_counter,
     )
-    # Commenting out the manifest files as the resolve_scp_data.py file will generate them instead
-    #     with open(SCP_TERRAFORM_MANIFEST, "a") as f:
-    #         for attachment in all_attachments:
-    #             scp_name = all_attachments[attachment]["scp_name"]
-    #             scp_description = all_attachments[attachment]["scp_desc"]
-    #             ou_ids = all_attachments[attachment]["scp_target_list"]
-    #             policy_path = all_attachments[attachment]["target_path"].replace("\\", "/")
-    #             logging.info(
-    #                 f"Creating policy attachment import for {scp_name} to {ou_ids}"
-    #             )
-    #             target_string = '","'.join(ou_ids)
-    #             f.write(
-    #                 f"""
-    # module "{scp_name}" {{
-    #     source          = "./scp_module"
-    #     scp_name        = "{scp_name}"
-    #     scp_desc        = "{scp_description}"
-    #     scp_policy      = jsonencode(jsondecode(file("./{policy_path}")))
-    #     scp_target_list = ["{target_string}"]
-    # }}
-    # """
-    #             )
 
+    if not skip_customer_scp_refresh:
+        logging.info("Printing attachment details for customer managed SCPs...")
+        logging.info(all_attachments)
     logging.info(f"Organization structure and SCPs saved in {OUTPUT_FOLDER}")

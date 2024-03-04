@@ -24,12 +24,32 @@ SCP_FOLDER = "service_control_policies"
 CHILD_TYPES = ["ORGANIZATIONAL_UNIT", "ACCOUNT"]
 ACCOUNT_SUFFIX = "_ACCOUNT"  # Differentiates OU folders vs Account folders
 OUTPUT_FILE = "scp_define_attach_auto.tf"
+GLOBAL_SCP_NAME_LIST = (
+    []
+)  # TODO - Implement a check to ensure that same-named policies are not present
 
 logging.basicConfig(level=logging.INFO)
 
 
 def get_scp_attachments(current_target_id, current_path, data_dict, org_client):
     logging.info(f"Scanning {current_path} for SCP attachments")
+    # Count the number of items in the current path and exit if more than 4
+    custom_scp_count = 0
+    for each_item in os.listdir(current_path):
+        if (
+            os.path.isfile(os.path.join(current_path, each_item))
+            and not re.search(r"\.guardrail$", each_item)
+            and not re.search(r"^FullAWSAccess\.placeholder$", each_item)
+        ):
+            custom_scp_count += 1
+        if custom_scp_count > 4:
+            raise Exception(
+                f"The {current_path} folder has more than 4 attachments, making it invalid. Fix it before continuing."
+            )
+        if not re.search(r"(ROOT|ACCOUNT)$", current_path) and custom_scp_count > 2:
+            raise Exception(
+                f"The {current_path} folder is an OU folder with more than 2 custom attachments, making it invalid. Fix it before continuing."
+            )
     for json in glob.glob(os.path.join(current_path, "*.json"), recursive=False):
         base_name = os.path.basename(json).replace(".json", "")
         data_dict[base_name] = {
@@ -77,14 +97,19 @@ def get_scp_attachments(current_target_id, current_path, data_dict, org_client):
                     + ACCOUNT_SUFFIX
                 )
             # Recursive call for each sub-OU
-            data_dict.update(
-                get_scp_attachments(
-                    current_target_id=object_id,
-                    current_path=os.path.join(current_path, child_path_name),
-                    data_dict=data_dict,
-                    org_client=org_client,
+            try:
+                data_dict.update(
+                    get_scp_attachments(
+                        current_target_id=object_id,
+                        current_path=os.path.join(current_path, child_path_name),
+                        data_dict=data_dict,
+                        org_client=org_client,
+                    )
                 )
-            )
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    "The AWS OU structure contains a resource without a matching file/folder in the SCP repo. To resolve this, run the update_scp_ou_structure workflow."
+                )
 
     return data_dict
 
@@ -109,6 +134,10 @@ module "{scp_name}" {{
     scp_desc        = jsondecode(file("./{scp_policy_path}")).description
     scp_policy      = jsonencode(jsondecode(file("./{scp_policy_path}")).policy)
     scp_target_list = [{scp_target_list_string}]
+}}
+
+output "{scp_name}_byte_size" {{
+    value = module.{scp_name}.scp_byte_size
 }}
 """
     return scp_resource_string
