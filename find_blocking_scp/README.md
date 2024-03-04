@@ -10,5 +10,5 @@ For more details, see the script!
 ## Example Usage
 
 ```bash
-scp_block_finder.py --target "999999999999" --action "logs:DescribeLogGroups" --resource "arn:aws:logs:us-west-1:999999999999:log-group::log-stream:" --region "us-east-1"
+find_blocking_scp.py --target "999999999999" --action "logs:DescribeLogGroups" --resource "arn:aws:logs:us-west-1:999999999999:log-group::log-stream:" --region "us-east-1"
 ```
