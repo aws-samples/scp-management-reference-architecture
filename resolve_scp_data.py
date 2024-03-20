@@ -102,13 +102,17 @@ def get_scp_attachments(current_target_id, current_path, data_dict, org_client):
             ParentId=current_target_id, ChildType=child_type
         )
         while "NextToken" in children:
-            children.append(
-                org_client.list_children(
-                    ParentId=current_target_id,
-                    ChildType=child_type,
-                    NextToken=children["NextToken"],
-                )
+            next_token_response = org_client.list_children(
+                ParentId=current_target_id,
+                ChildType=child_type,
+                NextToken=children["NextToken"],
             )
+            for next_child in next_token_response["Children"]:
+                children["Children"].append(next_child)
+            if "NextToken" in next_token_response:
+                children["NextToken"] = next_token_response["NextToken"]
+            else:
+                del children["NextToken"]
         # Make a recursive call for each sub-OU or Account
         for child in children["Children"]:
             object_id = child["Id"]
@@ -135,7 +139,7 @@ def get_scp_attachments(current_target_id, current_path, data_dict, org_client):
             except FileNotFoundError:
                 raise FileNotFoundError(
                     "The AWS OU structure contains a resource without a matching file/folder in the SCP repo.\n\
-                    To resolve this, run the generate_scp_ou_structure_and_imports.py script."
+                    To resolve this, run the update_scp_ou_structure workflow."
                 )
 
     return data_dict
