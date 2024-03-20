@@ -85,7 +85,9 @@ def get_all_child_accounts(parent_id, org_client, next_token=None, child_account
     child_accounts.extend(response["Accounts"])
 
     if "NextToken" in response:
-        get_all_child_accounts(parent_id, org_client, response["NextToken"], child_accounts)
+        get_all_child_accounts(
+            parent_id, org_client, response["NextToken"], child_accounts
+        )
 
     return child_accounts
 
@@ -206,7 +208,7 @@ import {{
             parent_id=ou_id,
             org_client=org_client,
         )
-        for child in child_ous["OrganizationalUnits"] + child_accounts["Accounts"]:
+        for child in child_ous + child_accounts:
             attachment_dict.update(
                 get_child_ou_and_scps(
                     child["Id"],
