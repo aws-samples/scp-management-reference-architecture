@@ -203,10 +203,12 @@ import {{
         child_ous = get_all_child_ous(
             parent_id=ou_id,
             org_client=org_client,
+            child_ous=[],
         )
         child_accounts = get_all_child_accounts(
             parent_id=ou_id,
             org_client=org_client,
+            child_accounts=[],
         )
         for child in child_ous + child_accounts:
             attachment_dict.update(
