@@ -68,7 +68,7 @@ def get_all_child_ous(parent_id, org_client, next_token=None, child_ous=[]):
     child_ous.extend(response["OrganizationalUnits"])
 
     if "NextToken" in response:
-        get_all_child_ous(parent_id, response["NextToken"], child_ous)
+        get_all_child_ous(parent_id, org_client, response["NextToken"], child_ous)
 
     return child_ous
 
@@ -85,7 +85,7 @@ def get_all_child_accounts(parent_id, org_client, next_token=None, child_account
     child_accounts.extend(response["Accounts"])
 
     if "NextToken" in response:
-        get_all_child_accounts(parent_id, response["NextToken"], child_accounts)
+        get_all_child_accounts(parent_id, org_client, response["NextToken"], child_accounts)
 
     return child_accounts
 
