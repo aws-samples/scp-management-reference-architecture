@@ -198,8 +198,14 @@ import {{
 
     # Recursively process child OUs and accounts
     if not re.match(r"\d{12}", ou_id):
-        child_ous = get_all_child_ous(ParentId=ou_id, org_client=org_client)
-        child_accounts = get_all_child_accounts(ParentId=ou_id, org_client=org_client)
+        child_ous = get_all_child_ous(
+            parent_id=ou_id,
+            org_client=org_client,
+        )
+        child_accounts = get_all_child_accounts(
+            parent_id=ou_id,
+            org_client=org_client,
+        )
         for child in child_ous["OrganizationalUnits"] + child_accounts["Accounts"]:
             attachment_dict.update(
                 get_child_ou_and_scps(
