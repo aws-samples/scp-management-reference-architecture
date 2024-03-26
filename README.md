@@ -109,7 +109,9 @@ Before making changes, validate that the SCP statement(s) you are adding are not
            "organizations:AttachPolicy",
            "organizations:DetachPolicy",
            "organizations:EnablePolicyType",
-           "organizations:DisablePolicyType"
+           "organizations:DisablePolicyType",
+           "organizations:TagResource",
+           "organizations:UntagResource"
          ],
          "Resource": [
            "arn:aws:organizations::*:policy/*/service_control_policy/*",
