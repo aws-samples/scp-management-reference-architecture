@@ -181,6 +181,7 @@ def find_blocking_scp(
                         )
                     except KeyError:
                         logging.debug("No Conditions key in statement.")
+                        condition_match = True
 
                     # Filter out non-matching SCP statements
                     if resource_match and action_match and condition_match:
