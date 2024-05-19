@@ -2,7 +2,7 @@
 # Define Variables to pass list of OUs or Account IDs to which SCPs need to be attached.data ""\\ "name" {
 # This is applicable only if you want to attach your SCP to multiple OUs but not all
 # Values for the below mentioned variables should be provided in the terraform.tfvars file in the same directory as the current file is
-################################################
+#################################################
 
 variable "apply_allowed_services_ou_ids" {
   type        = list(string)
