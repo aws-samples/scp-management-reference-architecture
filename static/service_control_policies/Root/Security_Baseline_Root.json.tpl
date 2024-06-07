@@ -108,7 +108,6 @@
             "Effect": "Deny",
             "Action": [
                 "guardduty:CreatePublishingDestination",
-                "guardduty:DeletePublishingDestination",
                 "guardduty:StopMonitoringMembers",
                 "guardduty:TagResource",
                 "guardduty:UntagResource",
@@ -142,6 +141,21 @@
                         "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_<PERMISSION SET NAME>_*",
                         "arn:aws:iam::*:role/<ALL PIPELINE ROLES PLACEHOLDER>"
                     ]
+                }
+            }
+        },
+        {
+            "Sid": "EnforceGenAIAccessedDataEncrypt",
+            "Effect": "Deny",
+            "Action": [
+                "bedrock:*",
+                "qbusiness:*",
+                "q:*"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "false"
                 }
             }
         }

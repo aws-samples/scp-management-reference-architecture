@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - sudo yum install -y yum-utils
+      - sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo 
+      - sudo yum -y install terraform
+      - terraform version
+      - python --version 
+      - pip install tf-policy-validator
+      - tf-policy-validator -h
+      - cd ../
+      - git clone https://github.com/awslabs/terraform-iam-policy-validator.git ## clonning the IAM Access Analyzer policy check files
+      - cd src
+  build:
+    commands:
+      - echo "Running IAM Access Analyzer policy validation..."
+      - pwd
+      - terraform init
+      - terraform plan -out tf.plan ## generate terraform plan file
+      - terraform show -json -no-color tf.plan > tf.json ## convert plan files to machine-readable JSON files. 
+      - tf-policy-validator validate --config ../terraform-iam-policy-validator/iam_check/config/default.yaml --template-path ./tf.json --region us-east-1
+  post_build:
+    commands:
+      - echo "Access Analyzer policy validation complete..."

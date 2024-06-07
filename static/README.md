@@ -1,91 +1,54 @@
 # Service Control Policy (SCP) Management Pipeline
 
-In this example, you will automate AWS SCP pipeline for managing and tracking service control policies (SCPs) across an organization’s multi-account environment. 
+This repo contains the AWS Service Control Policies (SCPs) custom built for your company's AWS organiztion, and attaches policies to specific AWS Organizational Units. **This DOES NOT include the SCPs created by AWS Control Tower as Control tower Guardrails**
 
-![SCP deployment pipeline example archiecture](/static/ref_arch.png "Example Architecture")
+## Content
 
-### Prerequisites
+- [Service Control Policy (SCP) Management Pipeline](#service-control-policy-scp-management-pipeline)
+  - [Content](#content)
+- [Code Walk-through](#code-walk-through)
+  - [Repository Structure](#repository-structure)
+    - [Scripts in this directory](#scripts-in-this-directory)
+    - [service\_control\_policies](#service_control_policies)
+    - [scp\_module](#scp_module)
+  - [SCP File Naming Convention](#scp-file-naming-convention)
+    - [SCP File Names for Root:](#scp-file-names-for-root)
+    - [SCP File Names for Multiple OUs:](#scp-file-names-for-multiple-ous)
+    - [SCP File Names for any specific OU:](#scp-file-names-for-any-specific-ou)
+    - [SCP File Names for any specific AWS Account:](#scp-file-names-for-any-specific-aws-account)
+- [Steps to manage SCPs](#steps-to-manage-scps)
+  - [Steps to follow for Adding New SCPs](#steps-to-follow-for-adding-new-scps)
+  - [Steps to edit existing SCPs](#steps-to-edit-existing-scps)
+  - [Steps to follow for Denying All Actions from a specific OU](#steps-to-follow-for-denying-all-actions-from-a-specific-ou)
 
-Before getting started, 
-* Make sure that you have a pre-configured [Amazon SNS topic with atleast one verified subscriber](https://docs.aws.amazon.com/sns/latest/dg/sns-create-topic.html).
-* You also need organization units in your AWS environment as the SCPs will need target to be attached.
+# Code Walk-through
 
-Basic understating of the following can help as this solution uses: 
-* Python and [Boto3](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html).
-* [CDK environments](https://docs.aws.amazon.com/cdk/v2/guide/environments.html).
-
-## Deploy the infrastructure and set up the pipeline
-
-1. Use the following command to download and unzip the Cloud Development Kit (CDK) project associated with this blog post.
-
-    ```git clone https://github.com/aws-samples/scp-management-reference-architecture```
-    
-2. Create a virtual Python environment to contain the project dependencies by using the following command.
-
-    ```python3 -m venv .venv```
-
-3. Activate the virtual environment with the following command.
-
-    ```source .venv/bin/activate```
-
-4. Install the project requirements by using the following command.
-
-    ```pip install -r requirements.txt```
-
-5. Use the following command to update the CDK CLI to the latest major version.
-
-    ```npm install -g aws-cdk@2 --force```
-
-6. Before you can deploy the CDK project, use the following command to bootstrap your AWS environment. Bootstrapping is the process of creating resources needed for deploying CDK projects. These resources include an Amazon Simple Storage Service (Amazon S3) bucket for storing files and IAM roles that grant permissions needed to perform deployments.
-
-    ```cdk bootstrap```
-
-7. Finally, use the following command to deploy the pipeline infrastructure. Replace SNS arn of the topic you want to receive alerts for manual approval with your sns arn.
-
-    ```cdk deploy --parameters SNSarn=SNS arn of the topic you want to receive alerts for manual approval``` 
-
-8. The deployment will generate create a CodeCommmit repository with the files in this repository, CodeBuild projects for the different validation steps for the SCP deployment, and a CodePipeline tying all the CodeBuild steps togather.
-
-9. Once the pipeline runs, and if the SCPs specified in the templates pass all the validation steps, a notification will be sent to the subscribed email/mobile address on the SNS topic that was provided during CDK deploy. Once you approve the changes, the pipeline will attempt to deploy SCPs in your AWS Organization if the correct organization structure exists. 
-
-### Cleanup
-
-Use the following command to delete the infrastructure that was provisioned as part of the examples in this blog post.
-
-  ```cdk destroy```
-
-
-## Repository walk-through
-
-### Repository Structure
+## Repository Structure
 
 ```sh
-
 .
-├── devtools.py # <-- sets up the development and deployment tools.
-├── pipeline.py # <-- defines the CI/CD pipeline stages and how the application is built and deployed.
-├── SCP_Management_Pipeline.py  # <-- sets up the main resources required for the SCP pipeline solution.
-├── Static
-  ├── scp_define_attach.tf     # <-- main terraform file that is executed when you perform <terraform apply>.
-  ├── variables.tf             # <-- variable definition file
-  ├── terraform.tfvars         # <-- pass values to variables before execution through this file
-  ├── service_control_policies # <-- a directory with sub-directories specific to the OUs to which SCPs are directly attached
-      ├── Root                      # <-- all SCP policies to be attached directly to Root
-      ├── InfrastructureOU          # <-- all SCP policies to be attached directly to Infrastructure OU
-      ├── MultiOUs                  # <-- all SCP policies to be attached directly to the list of multiple OUs.
-                                    #     To check the list, refer to .tfvars files in terraform directory.
-                                    #     Look for variables whose name is similar to the last keyword of the SCP policy
-  ├── scp_module               # <-- code for creating SCPs and attaching them to targets
-  ├── List-of-SCPs.md          # <-- A file containing overview of all the SCPs enabled in your company.
-                              #     Must be updated every time a change is made to any SCP policy
+├── scp_define_attach.tf     # <-- main terraform file that is executed when you perform <terraform apply>.
+├── variables.tf             # <-- variable definition file
+├── terraform.tfvars         # <-- pass values to variables before execution through this file
+├── providers.tf             # <-- declare cloud providers, SaaS providers, and other APIs for Terraform to interact with
+├── service_control_policies # <-- a directory with sub-directories specific to the OUs to which SCPs are directly attached
+    ├── Root                      # <-- all SCP policies to be attached directly to Root
+    ├── InfrastructureOU          # <-- all SCP policies to be attached directly to Infrastructure OU
+    ├── MultiOUs                  # <-- all SCP policies to be attached directly to the list of multiple OUs.
+                                  #     To check the list, refer to .tfvars files in terraform directory.
+                                  #     Look for variables whose name is similar to the last keyword of the SCP policy
+├── scp_module               # <-- code for creating SCPs and attaching them to targets
+├── List-of-SCPs.md          # <-- A file containing overview of all the SCPs enabled in your company.
+                             #     Must be updated every time a change is made to any SCP policy
 └── README.md                # <-- This file
 ```
 
 ### Scripts in this directory
 
 1. **_`scp_define_attach.tf`_** - this is the main terraform file that is executed. All the SCPs creation and attachement calls are made from this file.
-2. **_`variables.tf`_** - this is where you define all the runtime values that you want to pass to the SCP creaion process, which includes account IDs, OU names etc.
-3. **_`terraform.tfvars`_** - this is the file where you provide the value for each of the variables defined in `variables.tf` file
+2. **_`variables.tf`_** - this is where you define all the runtime variables that you want to pass to the SCP creaion / updation process, which includes account IDs, OU names etc.
+3. **_`terraform.tfvars`_** - this is the file where you provide the runtime value for each of the variables defined in `variables.tf` file
+4. **_`providers.tf`_** - this is to declare all the providers that Terraform need to interact with, like cloud providers, SaaS providers, and other APIs
 
 ### service_control_policies
 
@@ -108,6 +71,7 @@ Use the following command to delete the infrastructure that was provisioned as p
 ## SCP File Naming Convention
 
 > NOTE:
+>
 > 1. All SCP files created in this repository are template files (`.tpl` extension)
 > 2. Any SCP file you create in this repository should have a suffix of `.json` followed by the extension `.tpl`
 
@@ -140,6 +104,8 @@ Use the following command to delete the infrastructure that was provisioned as p
 - Infrastructure*Baseline*_Account Name or ID_.json.tpl
 - Data*Baseline*_Account Name or ID_.json.tpl
 
+# Steps to manage SCPs
+
 ## Steps to follow for Adding New SCPs
 
 1.  First identify the target to which your new SCP statement should be attached.
@@ -167,26 +133,21 @@ Use the following command to delete the infrastructure that was provisioned as p
 5.  Next, push your code for a PR and after approval the new SCP policy actions will be reflected in your AWS organizations.
 
 > NOTE:
+>
 > 1. If you want to pass any specific value to the SCP policy like account ID or a role name etc, you can pass it as an input variable to the `scp_policy`
 > 2. If you want to attach the SCP to a list of OUs and no other SCPs are already attached to this target list of OUs, then you can define a variable in the `variables.tf` as a list(string). Define the value of this variable in the `terraform.tfvars` file and enter the name of all of your chosen OUs in it.
 
-### Steps to edit existing SCPs
+## Steps to edit existing SCPs
 
 Either edit policy's Action or Resource or Conditions
 
 1.  First identify where in `service_control_policies` directory the SCP policy is defined
 2.  Based on the correct `.tpl file` chosen, next edit the file.
 3.  Update the `List-of-SCPs.md` with details of the new policy statement added to an existing SCP in service_control_policies directory.
-4.  After file edit, the pipeline will detect the change and run.
+4.  After file edit, push your code for a PR and after approval the policy changes will be reflected in your AWS organizations.
 
 ## Steps to follow for Denying All Actions from a specific OU
 
 Remove the `FullAWSAccess` policy that is directly attached to the OU to which you want to deny all actions.
 
 > NOTE: The `FullAWSAccess` policy inherited from a parent OU will not allow permissions to a principal (OU or account) until you directly attach the `FullAWSAccess` policy to the principal.
-
-## Security
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
-
-## License
-This library is licensed under the MIT-0 License. See the LICENSE file.

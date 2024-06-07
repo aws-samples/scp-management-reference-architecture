@@ -62,6 +62,22 @@
                     ]
                 }
             }
+        },
+        {
+            "Sid": "PreventMLmodelsnonVPCcreation",
+            "Effect": "Deny",
+            "Action": [
+                "sagemaker:CreateHyperParameterTuningJob",
+                "sagemaker:CreateModel",
+                "sagemaker:CreateNotebookInstance",
+                "sagemaker:CreateTrainingJob"
+            ],
+            "Resource": "arn:aws:ec2:*:*:instance/*",
+            "Condition": {
+                "Null": {
+                    "sagemaker:VpcSubnets": "true"
+                }
+            }
         }
     ]
 }

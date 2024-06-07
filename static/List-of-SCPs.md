@@ -15,6 +15,7 @@ All SCP policies that fall under the SCP category - Account Baseline, are define
 |                                  | Prevent account region enable and disable                         | All (\*)               | Root                                                  |                                                                           |                                               |
 |                                  | Prevent billing modification                                      | All (\*)               | Root                                                  |                                                                                                                            |                                               |
 |                                  | Prevent specific tag modifications                                | All (\*)               | Root                                                  |                                                                                                                            |  |
+|                                  | **Restrict GenAI model invocations**                              | All (\*)               | Root                                                  |      Privileged Role                                                                                                                      |  |
 | Account_Baseline_AllowedServices (Multi OU)| Deny any AWS service usage outside the approved list              | All (\*)               | All OUs except Testing OUs (like Sandbox) OU |||
                                 
 ---
@@ -31,6 +32,7 @@ All SCP policies that fall under the SCP category - Infrastructure Baseline, are
 |                                       | Enforce use of IMDSv2 for instance creation                                                            | All EC2 Instances    | Root | |                  |
 |                                       | Prevent removal of IMDSv2                                                                              | All EC2 Instances    | Root  |   |                  |
 |                                       | Prevent VPC privilege actions                                                                          | All (\*)             | Root                                                          | | |
+|                                       | **Prevent non-VPC creation of ML models**                                                                           | All (\*)             | Root
 | Infrastructure_Baseline_VPCBoundaries        | Prevent broad list of privilege VPC and EC2 Actions                                                    | All (\*)             | All OUs except Infrastructure OU | | |
 |                                       | Prevent write actions for DirectConnect, Global Accelerator, CloudFront, Internet gateway, VPC Peering | All (\*)             | All OUs except Infrastructure OU    |                                                                                                                                                                                       |                  |
 | Infrastructure_Baseline_InfrastructureOU | Prevent DHCP options, Subnet CIDR, Network ACLs, Route Table edit actions                              | All (\*)             | Infrastructure OU                                  |  |                  |
@@ -53,6 +55,7 @@ All SCP policies that fall under the SCP category - Security Baseline, are defin
 |                        | Prevent federation write activities through AWS IAM | All (\*)                                     | Root                      | |                  |
 |                        | Prevent write actions for privilege IAM roles       | Breakglass-role, place holder for more roles | Root                      | |                  |
 |                        | Prevent modification of other Security Services     | All (\*)                                     | Root                      | |                  |
+|                        | **Enforce Encryption of Data Accessed by GenAI Services**     | All (\*)                                     | Root                      | |                  |
 |                        |                                                     |                                              |                           
 
 ---
@@ -69,4 +72,5 @@ All SCP policies that are defined in any of the Data Baseline SCP files, should 
 |                       | Prevent S3 public access                             | All (\*)                               | Root                      | |                  |
 |                       | Prevent disabling EBS encryption                     | All (\*)                               | Root                      | |                  |
 |                       | Prevent creation of unencrypted RDS instances        | All (\*)                               | Root                      | |                  |
+|                       | **Restrict Knowledge Base creation of GenAI models**         | All (\*)                               | Root                      | Privileged role |                  |
 |                       |                                                      |                                        |                           |                                                                                                                                                                           |                  |
