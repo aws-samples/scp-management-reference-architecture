@@ -115,6 +115,9 @@ Use the following command to delete the infrastructure that was provisioned as p
 
 ### SCPs Deployment through your chosen pipeline
 
+For deploying the SCPs through your chosen pipeline or directly in your organization using Terraform as the Infrastructure-as-Code (IaC), navigate directly to the [source_code](/source_code) folder.
+
+There are detail steps mentioned about the scripts defined and how to deploy them.
 
 ## Security
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
