@@ -23,6 +23,7 @@ This repository will help you automate the deployment, management and tracking o
 ├── config.yaml      # <-- defines optional extensions of the core solution.
 ├── requirements.txt # <-- defines the list of packages or libraries needed for this deployment to work.
 ├── SCP_Management_Pipeline
+    ├── README.md                             # <-- defines the list of AWS resources created by CDK for managing this SCP management pipeline 
     ├── SCP_Management_Pipeline.py            # <-- sets up the main resources required for the SCP pipeline solution.
     ├── devtools.py                           # <-- sets up the development and deployment tools.
     ├── pipeline.py                           # <-- the main code that defines all the AWS resources created for building the CI/CD pipeline for SCP creation and management
