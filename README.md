@@ -2,7 +2,7 @@
 
 This repository will help you automate the deployment, management and tracking of AWS Service Control Policies (SCPs) through a CI/CD pipeline across an organization’s multi-account environment. 
 
-![SCP deployment pipeline example archiecture](/static/ref_arch.png "Example Architecture")
+![SCP deployment pipeline example archiecture](/source_code/ref_arch.png "Example Architecture")
 
 ## Content
 
@@ -14,7 +14,7 @@ This repository will help you automate the deployment, management and tracking o
     - [Cleanup:](#cleanup)
   - [SCPs Deployment through your chosen pipeline](#scps-deployment-through-your-chosen-pipeline)
 
-## Repository walk-through
+# Repository walk-through
 
 ```sh
 .
@@ -49,7 +49,7 @@ This repository will help you automate the deployment, management and tracking o
 └── README.md             # <-- This file
 ```
 
-## Prerequisites
+# Prerequisites
 
 Before getting started, 
 * Create a pre-configured [Amazon SNS topic with atleast one verified subscriber](https://docs.aws.amazon.com/sns/latest/dg/sns-create-topic.html).
@@ -65,11 +65,19 @@ Basic understating of the following can help as this solution uses:
 * [Getting started with Terraform for AWS](https://developer.hashicorp.com/terraform/tutorials/aws-get-started)
 * [Terraform: Beyond the Basics with AWS](https://aws.amazon.com/blogs/apn/terraform-beyond-the-basics-with-aws/)
 
-## Deployment Instructions
+# Deployment Instructions
 
-### Pipeline Deployment using CDK
+## Code edits required before deployment
 
-#### Steps to follow
+1. The [terraform.tfvars](/source_code/terraform.tfvars) file contains the value for all the SCP targets to which the SCPs are planned to be attached. Before deploying the code replace the value of each SCP target variable with the appropriate values of your AWS organization. 
+2. The [pipeline.py](/SCP_Management_Pipeline/pipeline.py) file contains all the AWS resources to be created for the SCP pipeline.  and , which are created for storing and locking the Terraform state files respectively.
+    - Edit the name of the S3 bucket (cdk resource - '*tfstate-backend-bucket*'). Replace the value of **bucket_name** with a S3 bucket name that you want to create in your organization where the terraform state files will be stored
+    - Edit the name of DynamboDB table(cdk resource - '*tfstate-lock-table*'). Replace the value of **table_name** with a DynamoDB table name that you want to create in your organization where the terraform state files will be locked
+3. The [backend.tf](/source_code/backend.tf) file where the value of the S3 bucket and DynamboDB table used for storing and locking the Terraform state files respectively are passed to Terraform. Provide the same names as used in the [pipeline.py](/SCP_Management_Pipeline/pipeline.py).
+
+## Pipeline Deployment using CDK
+
+### Steps to follow
 1. Use the following command to download this Cloud Development Kit (CDK) project in your environment.
 
     ```git clone https://github.com/aws-samples/scp-management-reference-architecture```
@@ -107,20 +115,20 @@ Basic understating of the following can help as this solution uses:
 
 10. Once the pipeline runs, and if the SCPs specified in the templates pass all the validation steps, a notification will be sent to the subscribed email/mobile address on the SNS topic that was provided during CDK deploy. Once you approve the changes, the pipeline will attempt to deploy SCPs in your AWS Organization if the correct organization structure exists. 
 
-#### Cleanup
+### Cleanup
 
 Use the following command to delete the infrastructure that was provisioned as part of the examples in this blog post.
 
   ```cdk destroy```
 
-### SCPs Deployment through your chosen pipeline
+## SCPs Deployment through your chosen pipeline
 
 For deploying the SCPs through your chosen pipeline or directly in your organization using Terraform as the Infrastructure-as-Code (IaC), navigate directly to the [source_code](/source_code) folder.
 
 There are detail steps mentioned about the scripts defined and how to deploy them.
 
-## Security
+# Security
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
-## License
+# License
 This library is licensed under the MIT-0 License. See the LICENSE file.

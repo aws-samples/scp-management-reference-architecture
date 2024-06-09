@@ -20,7 +20,7 @@ class DevTools(Construct):
         self._code_repo = codecommit.Repository(
             self, "Repository",
             repository_name="SCP-management-pipeline",
-            code=codecommit.Code.from_directory("./static/"),
+            code=codecommit.Code.from_directory("./source_code/"),
             description="Deploys SCPs")
         
         ### S3 Bucket

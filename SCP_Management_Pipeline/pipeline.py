@@ -51,7 +51,7 @@ class Pipeline(Construct):
 
         tfstate_bucket = s3.Bucket(
             self, "tfstate-backend-bucket",
-            bucket_name="reinforce24-iam343-tfstate-backend",
+            bucket_name="reinforce2024-iam343-tfstate-backend",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             versioned=True,
             object_ownership=s3.ObjectOwnership.OBJECT_WRITER,
@@ -115,7 +115,7 @@ def lambda_handler(event, context):
         # Define a DynamoDB table to lock the state file
         tflock_table = dynamodb.Table(
             self, "tfstate-lock-table",
-            table_name="reinforce-iam343-tfstate-lock",
+            table_name="reinforce2024-iam343-tfstate-lock",
             partition_key=dynamodb.Attribute(name="LockID", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PROVISIONED,  # Use billing_mode instead of billing
             encryption=dynamodb.TableEncryption.AWS_MANAGED,  # Use TableEncryption.AWS_MANAGED instead of TableEncryptionV2
