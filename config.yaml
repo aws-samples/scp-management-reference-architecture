@@ -1,0 +1,3 @@
+### Check if pipeline should support CDK workflows
+cdkstg:
+  enabled: True

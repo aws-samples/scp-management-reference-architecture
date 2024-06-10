@@ -66,6 +66,17 @@
                     "rds:StorageEncrypted": "false"
                 }
             }
+        },
+        {
+            "Sid": "RestrictGenAIKBCreation",
+            "Effect": "Deny",
+            "Action": ["bedrock:CreateKnowledgeBase"],
+            "Resource": "*",
+            "Condition": {
+                "ArnNotLike": {
+                    "aws:PrincipalArn": "arn:aws:iam::*:role/[privilegerole PLACE HOLDER]"
+                }
+            }
         }
     ]
 }

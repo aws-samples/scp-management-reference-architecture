@@ -58,9 +58,9 @@
             "Sid": "PreventBillingModify",
             "Effect": "Deny",
             "Action": [
-                "aws_portal:ModifyAccount",
-                "aws_portal:ModifyBilling",
-                "aws_portal:ModifyPaymentMethods"
+                "aws-portal:ModifyAccount",
+                "aws-portal:ModifyBilling",
+                "aws-portal:ModifyPaymentMethods"
             ],
             "Resource": "*"
         },
@@ -75,6 +75,22 @@
             "Condition": {
                 "ForAnyValue:StringEquals": {
                     "aws:TagKeys": ["PLACE HOLDER"]
+                }
+            }
+        },
+        {
+            "Sid": "RestrictGenAIModelInvocation",
+            "Effect": "Deny",
+            "Action": [
+                "bedrock:PutFoundationModelEntitlement",
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+                "bedrock:CreateModelInvocationJob"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "ArnNotLike": {
+                    "aws:PrincipalArn": "arn:aws:iam::*:role/[privilegerole PLACE HOLDER]"
                 }
             }
         }

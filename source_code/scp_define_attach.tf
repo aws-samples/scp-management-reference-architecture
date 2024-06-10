@@ -2,15 +2,6 @@
 data "aws_organizations_organization" "ou_model" {
 }
 
-#data "terraform_remote_state" "ou_model" {
-#  backend = "s3"
-#  config = {
-#    bucket = "" #S3 Bucket Name where the remote state files for the Organization building terraform code is stored
-#    key    = "" #exact location in the bucket
-#    region = "" #AWS region where AWS organizations is enabled
-#  }
-#}
-
 #####################
 ## Root Level SCPs
 #####################
