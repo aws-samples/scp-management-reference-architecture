@@ -37,7 +37,7 @@ class Pipeline(Construct):
         ### Define source Stage
         source_output = codepipeline.Artifact()
         pipeline.add_stage(
-            stage_name="SourceCode",
+            stage_name="Source-Code",
             actions=[
                 codepipeline_actions.CodeCommitSourceAction(
                     action_name="CodeCommit",
@@ -134,12 +134,12 @@ def lambda_handler(event, context):
 
         ### Terraform build
         security_ci = pipeline.add_stage(
-            stage_name="Terraformbuild"
+            stage_name="SCP-Plan-Validate"
         )
 
-        Terraformbuild = codebuild.PipelineProject(
-            self, "TERRAFORMBUILD",
-            project_name="Terraformbuild",
+        Terraformplan = codebuild.PipelineProject(
+            self, "Terraformplan",
+            project_name="SCP-Plan-Validate",
             build_spec=codebuild.BuildSpec.from_asset("./SCP_Management_Pipeline/terraformbuild_buildspec.yaml"),
             environment=codebuild.BuildEnvironment(
                 privileged=False,
@@ -149,8 +149,8 @@ def lambda_handler(event, context):
             timeout=cdk.Duration.minutes(60)
         )
 
-        ### Define role permissions for terraformbuild checks
-        Terraformbuild.role.attach_inline_policy(iam.Policy(self, "TERRAFORMBUILDInlinePolicy",
+        ### Define role permissions for Terraformplan checks
+        Terraformplan.role.attach_inline_policy(iam.Policy(self, "TerraformplanInlinePolicy",
             document=iam.PolicyDocument(
                 statements=[
                     iam.PolicyStatement( 
@@ -206,9 +206,9 @@ def lambda_handler(event, context):
 
         security_ci.add_action(
             codepipeline_actions.CodeBuildAction(
-                action_name="Terraformbuild",
+                action_name="Terraform-plan-validate",
                 input=source_output,
-                project=Terraformbuild,
+                project=Terraformplan,
                 run_order=1
             )
         )
@@ -216,13 +216,13 @@ def lambda_handler(event, context):
         ### Access analyzer checks only work if files are json format and dont allow variables, check the buildspec file 
         ### Transform policy stage
         security_ci = pipeline.add_stage(
-            stage_name="IAM-Access-analyzer-policy-checks"
+            stage_name="IAM-Access-analyzer-checks"
         )
 
         ### Define check policy grammar and syntax
         accessanalyzerchecks = codebuild.PipelineProject(
             self, "IAMACCESSANALYZERCHECKS",
-            project_name="IAM-Access-analyzer-policy-checks",
+            project_name="IAM-Access-analyzer-checks",
             build_spec=codebuild.BuildSpec.from_asset("./SCP_Management_Pipeline/access_analyzer_checks_buildspec.yaml"),
             environment=codebuild.BuildEnvironment(
                 privileged=False,
@@ -320,7 +320,7 @@ def lambda_handler(event, context):
         ### Add iam access analyzer checks action to pipeline
         security_ci.add_action(
             codepipeline_actions.CodeBuildAction(
-                action_name="IAM-Access-analyzer-policy-checks",
+                action_name="IAM-Access-analyzer-checks",
                 input=source_output,
                 project=accessanalyzerchecks,
                 run_order=3
@@ -331,26 +331,26 @@ def lambda_handler(event, context):
         review_url = f"https://{REGION}.console.aws.amazon.com/codesuite/codecommit/repositories/SCP-management-pipeline/browse?region={REGION}"
 
         ### Define Manual Approval Stage
-        manual_approval_stage = pipeline.add_stage(
-            stage_name="ManualApproval"
+        human_approval_stage = pipeline.add_stage(
+            stage_name="Human-Approval"
         )
 
-        manual_approval_action = codepipeline_actions.ManualApprovalAction(
-            action_name="ManualApprovalAction",
+        human_approval_action = codepipeline_actions.ManualApprovalAction(
+            action_name="ReviewerApprovalAction",
             notification_topic=sns_topic,
             additional_information=review_url
         )
-        manual_approval_stage.add_action(manual_approval_action)
+        human_approval_stage.add_action(human_approval_action)
 
         ## Add deploy stage to Pipeline
         ##
         security_ci = pipeline.add_stage(
-            stage_name="Deploy"
+            stage_name="SCP-Deploy"
         )
 
         Terraformdeploy = codebuild.PipelineProject(
             self, "TERRAFORM-DEPLOY",
-            project_name="Terraform-deploy",
+            project_name="SCP-Deploy",
             build_spec=codebuild.BuildSpec.from_asset("./SCP_Management_Pipeline/terraform_apply_buildspec.yaml"),
             environment=codebuild.BuildEnvironment(
                 privileged=False,
@@ -422,7 +422,7 @@ def lambda_handler(event, context):
 
         security_ci.add_action(
             codepipeline_actions.CodeBuildAction(
-                action_name="Terraformdeploy",
+                action_name="Terraform-apply",
                 input=source_output,
                 project=Terraformdeploy,
                 run_order=5
@@ -453,7 +453,7 @@ def lambda_handler(event, context):
             handler="lambda_function.lambda_handler",
             runtime=awslambda.Runtime.PYTHON_3_11,
             environment={
-                "TERRAFORMBUILD_PROJECT_NAME": Terraformbuild.project_name,
+                "Terraformplan_PROJECT_NAME": Terraformplan.project_name,
                 "ACCESSANALYZERCHECKS_PROJECT_NAME": accessanalyzerchecks.project_name,
                 "TERRAFORMDEPLOY_PROJECT_NAME": Terraformdeploy.project_name,
             }
@@ -462,7 +462,7 @@ def lambda_handler(event, context):
         ### Define role permissions for Lambda function
         lambda_function.add_to_role_policy(iam.PolicyStatement(
             actions=["codebuild:StartBuild"],
-            resources=[Terraformbuild.project_arn, accessanalyzerchecks.project_arn, Terraformdeploy.project_arn]
+            resources=[Terraformplan.project_arn, accessanalyzerchecks.project_arn, Terraformdeploy.project_arn]
         ))
 
         NagSuppressions.add_resource_suppressions(lambda_function,[{

@@ -5,12 +5,8 @@ This repository contains the CDK code used for deploying SCP Management Pipeline
 ## Content
 
 - [Folder Structure](#repository-walk-through)
-- [Prerequisites ](#prerequisites)
-- [Deployment Instructions](#deployment-instructions)
-  - [Pipeline Deployment using CDK](#pipeline-deployment-using-cdk)
-    - [Steps to follow:](#steps-to-follow)
-    - [Cleanup:](#cleanup)
-  - [SCPs Deployment through your chosen pipeline](#scps-deployment-through-your-chosen-pipeline)
+- [AWS Resources created by the CDK](#aws-resources-created-by-the-cdk)
+
 
 ## Repository walk-through
 
@@ -31,76 +27,24 @@ This repository contains the CDK code used for deploying SCP Management Pipeline
 
 Here are the list of AWS resources created by the CDK code to support the SCP Management Pipeline
 
-Before getting started, 
-* Create a pre-configured [Amazon SNS topic with atleast one verified subscriber](https://docs.aws.amazon.com/sns/latest/dg/sns-create-topic.html).
-    - This SNS topic is needed for notifying the reviewer for any change in the SCP management via email notification.
-    - As an email subscriber for SNS topic need manual verification hence for the ease of deployment this step is requested as a pre-requisite for this solution
-    - You can customize this notification step as per your organization requirement and also include it in the pipeline deployment code.
-* AWS Organizations must be enabled with multiple organization units (OUs).
-    - This solution is applicable only for those AWS environment which has a multi-account environment divided into multiple OUs
+1. **SCP-deployment-pipeline** - a Code Pipeline that hosts all the stages of a CI/CD pipeline for managing SCPs. This pipeline contains 5 stages.
+    - **Source-Code** - this stage hosts the code that defines the SCPs to be created and the targets of the SCPs
+    - **SCP-Plan-Validate** - this stage is to build a plan of all the resources (SCPs and their target attachments) to be created by deploying the code from source repository
+    - **IAM-Access-analyzer-checks** - this stage is to perform policy grammer checks, duplication of policy actions and more fine-grained syntax checks in the policy statements
+    - **Human-Approval** - this stage is to review the changes made by a security administrator via peer review process
+    - **SCP-Deploy** - this stage is to deploy the SCPs in the AWS organization (create / update / delete)
 
-Basic understating of the following can help as this solution uses: 
-* Python and [Boto3](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html).
-* [CDK environments](https://docs.aws.amazon.com/cdk/v2/guide/environments.html).
-* [Getting started with Terraform for AWS](https://developer.hashicorp.com/terraform/tutorials/aws-get-started)
-* [Terraform: Beyond the Basics with AWS](https://aws.amazon.com/blogs/apn/terraform-beyond-the-basics-with-aws/)
-
-## Deployment Instructions
-
-### Pipeline Deployment using CDK
-
-#### Steps to follow
-1. Use the following command to download this Cloud Development Kit (CDK) project in your environment.
-
-    ```git clone https://github.com/aws-samples/scp-management-reference-architecture```
-    
-2. Create a virtual Python environment to contain the project dependencies by using the following command.
-
-    ```python3 -m venv .venv```
-
-3. Activate the virtual environment with the following command.
-
-    ```source .venv/bin/activate```
-
-4. Install the project requirements by using the following command.
-
-    ```pip install -r requirements.txt```
-
-5. Use the following command to update the CDK CLI to the latest major version.
-
-    ```npm install -g aws-cdk@2 --force```
-
-6. Before you can deploy the CDK project, use the following command to bootstrap your AWS environment. Bootstrapping is the process of creating resources needed for deploying CDK projects. These resources include an Amazon Simple Storage Service (Amazon S3) bucket for storing files and IAM roles that grant permissions needed to perform deployments.
-
-    ```cdk bootstrap```
-
-7. Finally, use the following command to deploy the pipeline infrastructure. Replace SNS arn of the topic you want to receive alerts for manual approval with your sns arn.
-
-    ```cdk deploy --parameters SNSarn=<SNS arn of the topic you want to receive alerts for human approval>``` 
-
-8. The deployment will create the following AWS resources:
-   - a CodeCommmit repository with all files of [source_code](/source_code) folder which holds the source code for SCP creation and management,
-   - 3 CodeBuild projects, one for each of the pipeline stages - code validation, policy checks, code deploy (as defined in the architecture diagram above)
-   - a human approval stage in the pipeline 
-   - a CodePipeline tying all the CodeBuild steps togather
-   - necessary AWS resources to support the management of the pipeline. For details of the AWS resources created by this pipeline [refer to this readme](/SCP_Management_Pipeline/README.md)
-
-10. Once the pipeline runs, and if the SCPs specified in the templates pass all the validation steps, a notification will be sent to the subscribed email/mobile address on the SNS topic that was provided during CDK deploy. Once you approve the changes, the pipeline will attempt to deploy SCPs in your AWS Organization if the correct organization structure exists. 
-
-#### Cleanup
-
-Use the following command to delete the infrastructure that was provisioned as part of the examples in this blog post.
-
-  ```cdk destroy```
-
-### SCPs Deployment through your chosen pipeline
-
-For deploying the SCPs through your chosen pipeline or directly in your organization using Terraform as the Infrastructure-as-Code (IaC), navigate directly to the [source_code](/source_code) folder.
-
-There are detail steps mentioned about the scripts defined and how to deploy them.
-
-## Security
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
-
-## License
-This library is licensed under the MIT-0 License. See the LICENSE file.
+2. **reinforce2024-iam343-tfstate-backend** - an S3 bucket that stores the state information of SCP deployment
+3. **SCPManagementPipeline-PipelineCustomResourceProvid-xxxxxxx** - a Lambda function created as a custom CDK resource to upload a zero byte **terraform.tfstate** file in the above mentioned S3 bucket.All SCP state information are store in this .tfstate file.
+4. **reinforce2024-iam343-tfstate-lock** - a dynamoDB table that locks the state files of SCP deployment
+5. **SCP-Plan-Validate** - a code build project that defines the platform where this stage of the code will run. The build project also includes definition of the *buildspec* file where commands are defined to perform terraform plan and validate commands. 
+6. **SCPManagementPipeline-PipelineSCPPlanValidateTerraf--xxxxxxxx** - an IAM service role for the code build stage - SCP-Plan-Validate with an inline policy. This least-privilege access policy grants permission to Code Build to execute all the commands of this build stage
+7. **IAM-Access-analyzer-checks** - a code build project that defines the platform where this stage of the code will run. The build project also includes definition of the *buildspec* file where commands are defined to perform IAM Access Analyzer policy grammer, duplication checks. 
+8. **SCPManagementPipeline-PipelineIAMACCESSANALYZERCHEC-xxxxxxxx** - an IAM service role for the code build stage - IAM-Access-analyzer-checks with an inline policy. This least-privilege access policy grants permission to Code Build to execute all the commands of this build stage
+9. **Human-Approval** - a code build project that triggers a notification to a reviewer of the security administratoion team who verifies the SCP changes are valid.
+10. **SCP-Deploy** - a code build project that defines the platform where this stage of the code will run. The build project also includes definition of the *buildspec* file where commands are defined to perform terraform apply.
+11. **SCPManagementPipeline-PipelineSCPDeployTerraformapp-xxxxxxxx** - an IAM service role for the code build stage - SCP-Deploy with an inline policy. This least-privilege access policy grants permission to Code Build to execute all the commands of this build stage
+12. **SCPManagementPipeline-PipelinePullRequestEvent9EE5E-xxxxxxxxx** - an EventBridge rule that monitors CodeCommit Pull Request State Change and accordingly triggers the pipeline 
+13. **SCPManagementPipeline-DevToolsRepositorySCPManageme-xxxxxxxxx** - an EventBridge rule that monitors CodeCommit Repository State Change and accordingly triggers the pipeline 
+14. **SCPManagementPipeline-PipelineCustomResourceProvid-xxxxxxxxxxx** - 
+15. **SCPManagementPipeline-PipelineTargetForPullRequest-xxxxxxxxxxx** - 

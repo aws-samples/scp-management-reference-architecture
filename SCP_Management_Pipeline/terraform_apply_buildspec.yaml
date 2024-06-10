@@ -11,7 +11,6 @@ phases:
     commands:
       - echo "Running Terraform code deployment..."
       - terraform init
-      - terraform validate
   build:
     commands:
       - terraform apply -auto-approve
