@@ -1,0 +1,51 @@
+# This is a workflow to automatically generate a PR with updated OU structure for SCP attachments
+# This is modeled after the Role Vending Machine generate_providers_and_account_vars.yml workflow
+name: "Update SCP OU Structure"
+
+permissions:
+  id-token: write
+  contents: write # This is required for actions/checkout
+  pull-requests: write
+
+on:
+  schedule:
+    # Runs "10:50AM UTC Daily" (see https://crontab.guru)
+    - cron: "50 10 * * *"
+  workflow_dispatch:
+
+jobs:
+  generate-providers-and-account-vars:
+    name: "Update SCP OU Structure"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Source Environment Variables
+        id: dotenv
+        uses: falti/dotenv-action@v1
+        with:
+          path: ".github/workflows/.env"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip" # caching pip dependencies
+      - run: pip install -r ./requirements.txt
+
+      - name: Configure AWS Credentials for reading state
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.dotenv.outputs.aws_account_id }}:role/github-workflow-role-terraform_aws_scp_manager
+          role-session-name: ${{ github.actor }}_${{ github.job }}
+          aws-region: ${{ steps.dotenv.outputs.aws_region }}
+
+      - name: Generate latest OU stucture files
+        run: python3 generate_scp_ou_structure_and_imports.py --skip-import-creation --skip-customer-scp-refresh
+
+      - name: Commit changes
+        run: python3 .github/commit_changes.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
