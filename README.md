@@ -61,7 +61,9 @@ Before making changes, validate that the RCP/SCP statement(s) you are adding are
 
 ## Handling OU restructures
 
-1. Re-run the `generate_scp_ou_structure_and_import.py` script and modify as necessary to align SCPs to the new structure.
+1. Re-run the `generate_scp_ou_structure_and_import.py --skip-import-creation --skip-customer-scp-refresh` script and modify as necessary to align SCPs to the new structure.
+
+2. Alternatively, if you are using GitHub Actions, you can use the `update_scp_ou_structure.yaml` workflow file to run a daily task to refresh the representation of your OU/account structure. This will add/remove any OUs/accounts and commit any changes to a PR that you can approve.
 
 # Initial Implementation Steps
 
